@@ -5,12 +5,9 @@
  */
 package marte.swing.google.maps.samples;
 
-import java.awt.FlowLayout;
-import java.awt.geom.Point2D;
 import java.io.File;
 import marte.swing.google.maps.GoogleMapsScene;
 import javafx.embed.swing.JFXPanel;
-import javax.swing.JButton;
 import javax.swing.JFrame;
 
 /**
