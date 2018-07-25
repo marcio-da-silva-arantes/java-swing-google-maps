@@ -21,9 +21,10 @@
   <body>
     <div id="map"></div>
     <script>
+		var started = false;
 		var markers = new Map();
 		var map;
-		var event_click;
+		var event_click = [];
 		function initMap() {
 			map = new google.maps.Map(document.getElementById('map'), {
 			  center: {lat: -27.573252, lng: -48.537125},
@@ -32,9 +33,10 @@
 			});
 			map.setTilt(45);
 			map.addListener('click', function(e) {
-			  event_click = e;
+			  event_click.push(e);
 			  //console.log(e);
 			});
+			started = true;
 		}
 		function addMarker(lat, lng, key, label){
 			var marker = new google.maps.Marker({
