@@ -26,7 +26,7 @@ public class Simple{
         JFXPanel fxPanel = new JFXPanel();
         
         api.attach(fxPanel);
-
+        
         frame.add(fxPanel);
         frame.setSize(1300, 820);
         frame.setVisible(true);

@@ -5,17 +5,31 @@
  */
 package marte.swing.google.maps;
 
+import java.awt.event.KeyEvent;
 import java.awt.geom.Point2D;
 import java.io.File;
 import java.util.Arrays;
 import java.util.concurrent.Executors;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.embed.swing.JFXPanel;
+import javafx.event.Event;
+import javafx.event.EventDispatchChain;
+import javafx.event.EventDispatcher;
+import javafx.event.EventType;
 import javafx.scene.Scene;
+import javafx.scene.input.KeyCombination;
+import javafx.scene.input.MouseButton;
 import javafx.scene.web.WebEngine;
 import javafx.scene.web.WebView;
 import javafx.stage.Stage;
+import javax.swing.JFrame;
+import javax.swing.SwingUtilities;
+import marte.swing.google.maps.events.MapsEvent;
+import marte.swing.google.maps.models.LatLng;
+import netscape.javascript.JSObject;
 
 /**
  *
@@ -26,8 +40,8 @@ public class GoogleMapsScene extends Application{
     private static File maps_html;
     private WebView browser;
     private WebEngine engine;
-    private Scene scene;  
-
+    private Scene scene;
+    private Stage stage;
 
     public static GoogleMapsScene getInstance(){
         if(singleton==null){
@@ -40,7 +54,6 @@ public class GoogleMapsScene extends Application{
             throw new IllegalArgumentException("You can have only one instance of this class, call without args getInstance()");
         }
         GoogleMapsScene.maps_html = maps_html.exists() ? maps_html : new File("./html/maps.html");
-        //System.out.println(GoogleMapsScene.maps_html);
         Executors.newSingleThreadExecutor().execute(()->{
             Application.launch(GoogleMapsScene.class, args);
         });
@@ -52,12 +65,12 @@ public class GoogleMapsScene extends Application{
         if(singleton==null){
             throw new IllegalStateException("Application.launch doesn't work");
         }
-        //System.out.println("pass");
         return singleton;
     }
     
     @Override
     public void start(Stage primaryStage) throws Exception {
+        stage = primaryStage;
         browser = new WebView();
         engine = browser.getEngine();
         engine.setJavaScriptEnabled(true);
@@ -65,26 +78,61 @@ public class GoogleMapsScene extends Application{
         engine.load(maps_html.toURI().toString());
         scene = new Scene(browser);//,1200,720);
         singleton = this;
-        //System.out.println("notify");
+    }
+    public void addLoadListener(MapsEvent<Boolean> handle){
+        engine.setOnStatusChanged((event)->{
+            try{
+                if((Boolean)engine.executeScript("started;")){
+                    handle.handle(Boolean.TRUE);
+                }
+            }catch(Throwable ex){
+                handle.handle(Boolean.FALSE);
+            }
+        });
+    }
+    public void addClickListener(MapsEvent<LatLng> handle){
+        browser.setOnMouseClicked((event) -> {
+            if(event.getButton()==MouseButton.PRIMARY){
+                Object obj = engine.executeScript("event_click.shift();");
+                if(obj instanceof JSObject){
+                    JSObject js = (JSObject) obj;
+                    LatLng latlng = new LatLng(js.eval("this.latLng.lat()").toString(), js.eval("this.latLng.lng()").toString());
+                    handle.handle(latlng);
+                }
+            }
+        });
     }
 
     public void attach(JFXPanel fxPanel){
         fxPanel.setScene(scene);
     }
     
-    
-    public void addMarker(double lat, double lng, String title){
+    private String undefined(String val){
+        return val==null ? "undefined" : "'"+val+"'";
+    }
+    public void setFullScreen(JFrame frame, JFXPanel fxPanel){
         Platform.runLater(()->{
-            engine.executeScript(
-                "var position = new google.maps.LatLng("+lat+","+lng+");\n" +
-                "var marker = new google.maps.Marker({\n" +
-                "    position: position,\n" +
-                "    map: map,\n" +
-                "    title: '"+title+"'\n" +
-                "});"
-            );
+            stage.setFullScreenExitHint("Pressione Alt+F4 ou fechar para sair do modo de tela cheia");
+            stage.setFullScreenExitKeyCombination(KeyCombination.valueOf("??"));
+            stage.setOnCloseRequest((event)->{
+                fxPanel.setScene(scene);
+                frame.setVisible(true);
+            });
+            frame.setVisible(false);
+            stage.setFullScreen(true);
+            stage.setScene(scene);
+            stage.show();
         });
-            
+    }
+    public void addMarker(double lat, double lng, String key, String label){
+        Platform.runLater(()->{
+            engine.executeScript("addMarker("+lat+","+lng+",'"+key+"',"+undefined(label)+");");
+        });
+    }
+    public void delMarker(String key){
+        Platform.runLater(()->{
+            engine.executeScript("delMarker('"+key+"');");
+        });
     }
     public void addPolygon(String strokeColor, double strokeOpacity, double strokeWeight, String fillColor, double fillOpacity, Point2D... points){
         Platform.runLater(()->{
@@ -108,12 +156,6 @@ public class GoogleMapsScene extends Application{
     public void setCenter(double lat, double lng){
         Platform.runLater(()->{
             engine.executeScript("map.setCenter({lat: "+lat+", lng: "+lng+"})");
-        });
-    }
-    public void event(){
-        Platform.runLater(()->{
-            Object obj = engine.executeScript("event.latLng;");
-            System.out.println("obj = "+obj.toString());
         });
     }
 }
